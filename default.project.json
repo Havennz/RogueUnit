@@ -1,0 +1,33 @@
+{
+  "name": "Rogue Unit",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/ReplicatedStorage"
+      },
+      "Packages":{
+        "$path": "Packages"
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/ServerScriptService"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/StarterPlayer"
+        }
+      }
+    },
+
+    "ServerStorage": {
+      "$path": "src/ServerStorage"
+    }
+  }
+}
