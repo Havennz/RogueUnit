@@ -52,6 +52,8 @@ local MainService = Knit.CreateService({
 	Integrate morning voting: Add a voting system during the morning phase of the game.
 	Implement game loop: Create a loop to manage the different phases (night, day) of the game and ensure it continues running until the end.
 	Remove the player from the table PlayersInGame (Bug)
+
+If a player quits while the game is starting can cause a bug
 ]]
 
 function MainService:GetRole(player1, player2Name)
