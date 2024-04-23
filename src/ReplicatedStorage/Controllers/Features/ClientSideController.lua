@@ -6,6 +6,16 @@ local Knit = require(ReplicatedStorage.Packages.Knit)
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Themes = require(ReplicatedStorage.Shared.Themes)
 local roundTimer = ReplicatedStorage:WaitForChild("roundTimer")
+local VotesFolder = ReplicatedStorage:FindFirstChild("VotesFolder")
+local Observers = require(ReplicatedStorage.Packages.Observers)
+
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local MainGui = PlayerGui:WaitForChild("MainGui")
+local Exterior: Frame = MainGui.Frame
+local Interior: Frame = Exterior.Frame
+local Scrolling: ScrollingFrame = Interior.ScrollingFrame
+
+local ButtonConnections = {}
 
 local clientSideController = Knit.CreateController({
 	Name = "clientSideController",
@@ -22,30 +32,62 @@ function formatTime(seconds)
 end
 
 function clientSideController:UpdateTimer()
-	local PlayerGui = Player:WaitForChild("PlayerGui")
-	local MainGui = PlayerGui:WaitForChild("MainGui")
+	local Timer = MainGui.Frame.Timer
+	local valor = roundTimer.Value
+	if valor < 0 then
+		valor = 0
+	end
+
+	Timer.Text = formatTime(valor)
+end
+
+function clientSideController:setupButtons(enabled)
+	local MainService = Knit.GetService("MainService")
+
+	if enabled == false then
+		for _, x: RBXScriptConnection in pairs(ButtonConnections) do
+			x:Disconnect()
+		end
+	else
+		for _, x: TextButton in pairs(Scrolling:GetChildren()) do
+			if x:IsA("TextButton") and x.Name ~= "Template" then
+				local con = x.MouseButton1Click:Connect(function()
+					MainService:PlayerInteraction(x.Name)
+				end)
+				table.insert(ButtonConnections, con)
+			end
+		end
+	end
+end
+
+function clientSideController:ChangeText(text)
 	local Timer = MainGui.Frame.Timer
 
-	Timer.Text = formatTime(roundTimer.Value)
+	Timer.Text = text
 end
 
 function clientSideController:UpdatePlayers()
-	local PlayerGui = Player:WaitForChild("PlayerGui")
-	local MainGui = PlayerGui:WaitForChild("MainGui")
 	local Timer = MainGui.Frame.PlayerCounter
 
 	Timer.Text = (tostring(#Players:GetChildren()) .. "/8")
 end
 
-function clientSideController:UpdatePlayerCount() end
+function clientSideController:KillPlayer(playerName)
+	for _, x in pairs(Scrolling:GetChildren()) do
+		if x:IsA("TextButton") and x.Name == playerName then
+			local DP = x:FindFirstChild("DeadDisplay")
+			if DP then
+				DP.Visible = true
+			end
+		end
+	end
+end
+
+function clientSideController:ChatController(bool)
+	PlayerGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, bool)
+end
 
 function clientSideController:setGameState(str)
-	local PlayerGui = Player:WaitForChild("PlayerGui")
-	local MainGui = PlayerGui:WaitForChild("MainGui")
-
-	local Exterior: Frame = MainGui.Frame
-	local Interior: Frame = Exterior.Frame
-	local Scrolling: ScrollingFrame = Interior.ScrollingFrame
 	local Text1 = Exterior:WaitForChild("Timer")
 	local Text2 = Exterior:WaitForChild("PlayerCounter")
 
@@ -76,13 +118,47 @@ function clientSideController:setGameState(str)
 	end
 end
 
-function clientSideController:GetNewPlayer(userId)
-	local PlayerGui = Player:WaitForChild("PlayerGui")
+function clientSideController:EnableVotations(type, bool)
 	local MainService = Knit.GetService("MainService")
 
+	if bool == true then
+		for _, x in pairs(Scrolling:GetChildren()) do
+			if x:IsA("TextButton") and x.Name ~= "Template" then
+				local TargetFolder = VotesFolder:FindFirstChild(x.Name)
+				warn(type)
+				if type == "Werewolf" then
+					MainService:GetClass(Player.Name):andThen(function(Classe)
+						warn(Classe)
+						if Classe == "Werewolf" then
+							MainService:GetClass(x.Name):andThen(function(Classe)
+								local role = Classe
+								warn(role)
+								if role ~= "Werewolf" then
+									Observers.observeAttribute(TargetFolder, "WerewolfVotes", function(value)
+										x.Votes.Text = "Werewolf Votes: " .. tostring(value)
+										return function() end
+									end)
+									x.Votes.Visible = true
+								end
+							end)
+						end
+					end)
+				elseif type == "Normal" then
+					Observers.observeAttribute(TargetFolder, "NormalVotes", function(value)
+						x.Votes.Text = "Werewolf Votes: " .. tostring(value)
+						return function() end
+					end)
+					x.Votes.Visible = true
+				end
+			end
+		end
+	end
+end
+
+function clientSideController:GetNewPlayer(userId)
+	local MainService = Knit.GetService("MainService")
 	local TargetedPlayer = Players:GetPlayerByUserId(userId)
-	local MainGui = PlayerGui:WaitForChild("MainGui")
-	local Scrolling = MainGui:FindFirstChild("ScrollingFrame", true)
+
 	if Scrolling:FindFirstChild(TargetedPlayer.Name) then
 		return -- Already found this specific player in the list, not adding
 	end
@@ -93,28 +169,28 @@ function clientSideController:GetNewPlayer(userId)
 	local role
 	MainService:GetClass(TargetedPlayer.Name):andThen(function(Classe)
 		role = Classe
-		local ClonedTemplate = Template:Clone()
-		ClonedTemplate.TextLabel.Text = TargetedPlayer.Name
-		ClonedTemplate.Name = TargetedPlayer.Name
-		ClonedTemplate.ImageLabel.Image = content
-		ClonedTemplate.Parent = Scrolling
-		ClonedTemplate.Classe.Text = tostring(role) or "Unknown"
-		if Classes[role] then
-			-- Classes[role] exists, it's safe to access its properties
-			ClonedTemplate.Classe.TextColor3 = Classes[role]["NameColor"]
+		if Scrolling:FindFirstChild(TargetedPlayer.Name) then
+			return
 		else
-			-- Handle the case where role is not a valid class
-			print("Warning: Invalid role:", role)
+			local ClonedTemplate = Template:Clone()
+			ClonedTemplate.TextLabel.Text = TargetedPlayer.Name
+			ClonedTemplate.Name = TargetedPlayer.Name
+			ClonedTemplate.ImageLabel.Image = content
+			ClonedTemplate.Parent = Scrolling
+			ClonedTemplate.Classe.Text = tostring(role) or "Unknown"
+			if Classes[role] then
+				-- Classes[role] exists, it's safe to access its properties
+				ClonedTemplate.Classe.TextColor3 = Classes[role]["NameColor"]
+			else
+				-- Handle the case where role is not a valid class
+				print("Warning: Invalid role:", role)
+			end
+			ClonedTemplate.Visible = true
 		end
-		ClonedTemplate.Visible = true
 	end)
 end
 
 function clientSideController:RemovePlayer(playerName)
-	local PlayerGui = Player:WaitForChild("PlayerGui")
-	local MainGui = PlayerGui:WaitForChild("MainGui")
-	local Scrolling = MainGui:FindFirstChild("ScrollingFrame", true)
-
 	local target = Scrolling:FindFirstChild(playerName, true)
 	if target then
 		target:Destroy()
@@ -141,6 +217,26 @@ function clientSideController:KnitStart()
 
 	MainService.RemovePlayer:Connect(function(playerName)
 		self:RemovePlayer(playerName)
+	end)
+
+	MainService.ChangeText:Connect(function(str)
+		self:ChangeText(str)
+	end)
+
+	MainService.EnableButtons:Connect(function(bool)
+		self:setupButtons(bool)
+	end)
+
+	MainService.ChatController:Connect(function(bool)
+		self:ChatController(bool)
+	end)
+
+	MainService.VotesHandler:Connect(function(type, version)
+		if type == "Enable" then
+			self:EnableVotations(version, true)
+		elseif type == "Disable" then
+			self:EnableVotations(version, false)
+		end
 	end)
 end
 
