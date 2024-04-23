@@ -427,6 +427,8 @@ function MainService:KnitStart()
 			self:FireAllClients("UpdatePlayerCount")
 			self:FireAllClients("RemovePlayer", player.Name)
 			self.Game.PlayerCount -= 1
+    -- Remove the player of the playersInGame
+    self.PlayersInGame[player] = nil
 		end
 	end)
 end
