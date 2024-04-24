@@ -125,31 +125,39 @@ function clientSideController:EnableVotations(type, bool)
 		for _, x in pairs(Scrolling:GetChildren()) do
 			if x:IsA("TextButton") and x.Name ~= "Template" then
 				local TargetFolder = VotesFolder:FindFirstChild(x.Name)
-				warn(type)
-				if type == "Werewolf" then
-					MainService:GetClass(Player.Name):andThen(function(Classe)
-						warn(Classe)
-						if Classe == "Werewolf" then
-							MainService:GetClass(x.Name):andThen(function(Classe)
-								local role = Classe
-								warn(role)
-								if role ~= "Werewolf" then
-									Observers.observeAttribute(TargetFolder, "WerewolfVotes", function(value)
-										x.Votes.Text = "Werewolf Votes: " .. tostring(value)
-										return function() end
+				MainService:GetAlive(x.Name):andThen(function(isAlive)
+					print(isAlive)
+					if isAlive == true then
+						if type == "Werewolf" then
+							MainService:GetClass(Player.Name):andThen(function(Classe)
+								if Classe == "Werewolf" then
+									MainService:GetClass(x.Name):andThen(function(Classe)
+										local role = Classe
+										if role ~= "Werewolf" then
+											Observers.observeAttribute(TargetFolder, "WerewolfVotes", function(value)
+												x.Votes.Text = "Werewolf Votes: " .. tostring(value)
+												return function() end
+											end)
+											x.Votes.Visible = true
+										end
 									end)
-									x.Votes.Visible = true
 								end
 							end)
+						elseif type == "Normal" then
+							Observers.observeAttribute(TargetFolder, "NormalVotes", function(value)
+								x.Votes.Text = "Votes: " .. tostring(value)
+								return function() end
+							end)
+							x.Votes.Visible = true
 						end
-					end)
-				elseif type == "Normal" then
-					Observers.observeAttribute(TargetFolder, "NormalVotes", function(value)
-						x.Votes.Text = "Werewolf Votes: " .. tostring(value)
-						return function() end
-					end)
-					x.Votes.Visible = true
-				end
+					end
+				end)
+			end
+		end
+	else
+		for _, x in pairs(Scrolling:GetChildren()) do
+			if x:IsA("TextButton") and x.Name ~= "Template" then
+				x.Votes.Visible = false
 			end
 		end
 	end
@@ -237,6 +245,10 @@ function clientSideController:KnitStart()
 		elseif type == "Disable" then
 			self:EnableVotations(version, false)
 		end
+	end)
+
+	MainService.KillPlayer:Connect(function(name)
+		self:KillPlayer(name)
 	end)
 end
 
