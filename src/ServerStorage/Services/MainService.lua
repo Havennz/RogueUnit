@@ -29,14 +29,15 @@ local MainService = Knit.CreateService({
 		ChatController = Knit.CreateSignal(),
 		VotesHandler = Knit.CreateSignal(),
 		KillPlayer = Knit.CreateSignal(),
+		RevealRole = Knit.CreateSignal(),
 	},
 	PlayersInGame = {},
 	Configurations = {
 		["Werewolfs"] = 0,
 		["Mediuns"] = 0,
 		["Villagers"] = 0,
-		["PlayersToStart"] = 2,
-		["TimeBetweenRounds"] = 15,
+		["PlayersToStart"] = 3,
+		["TimeBetweenRounds"] = 35,
 		["GameStarted"] = false,
 	},
 	Game = {
@@ -48,13 +49,13 @@ local MainService = Knit.CreateService({
 	To Do:
 
 	✅ Implement werewolf vote visibility: Allow werewolves to see who they are Voting to kill at night.
-	Enable medium role functionality: Allow mediums to see the class (e.g., villager, werewolf) of their target player.
+	✅Enable medium role functionality: Allow mediums to see the class (e.g., villager, werewolf) of their target player.
 	✅Enable villager vote visibility: Allow villagers to see who they are Voting to kill during the day.
 	✅Integrate morning Voting: Add a Voting system during the morning phase of the game.
-	✅ Implement game loop: Create a loop to manage the different phases (night, day) of the game and ensure it continues running until the end.
-	✅ Remove the player from the table PlayersInGame (Bug)
-	Se empatar voto ninguém morre
-	Werewolf tá podendo votar morto
+	✅Implement game loop: Create a loop to manage the different phases (night, day) of the game and ensure it continues running until the end.
+	✅Remove the player from the table PlayersInGame (Bug)
+	✅Se empatar voto ninguém morre
+	✅Werewolf tá podendo votar morto
 ]]
 
 function MainService:GetAliveStat(playerName)
@@ -171,40 +172,45 @@ function MainService:FinishVoting()
 	local typeOfVoting = CheckTypeOfVoting()
 
 	local function MostVotedOfType(tipo)
-		local mostVotedPlayer = nil
+		local mostVotedPlayers = {}
 		local mostVotes = 0
 		local hasVotes = false
 
 		for _, playerVotes in pairs(Votes) do
 			for playerName, votes in pairs(playerVotes) do
 				local votesOfType = votes[tipo .. "Votes"] or 0 -- Se votes[tipo .. "Votes"] for nil, considera como 0
-				if votesOfType > 0 and votesOfType > mostVotes then
-					mostVotes = votesOfType
-					mostVotedPlayer = playerName
-					hasVotes = true
+				if votesOfType > 0 then
+					if votesOfType > mostVotes then
+						mostVotes = votesOfType
+						mostVotedPlayers = { playerName }
+						hasVotes = true
+					elseif votesOfType == mostVotes then
+						table.insert(mostVotedPlayers, playerName)
+						hasVotes = true
+					end
 				end
 			end
 		end
 
 		if hasVotes then
-			return mostVotedPlayer
+			return mostVotedPlayers
 		else
-			return "nil"
+			return nil
 		end
 	end
 
-	local MostVotedPlayerName = MostVotedOfType(typeOfVoting)
-	if typeOfVoting == "Werewolf" then -- Aqui você pode adicionar sons customizados para cada tipo de morte
-		local folder = ServerStorage:WaitForChild("PlayerData"):FindFirstChild(MostVotedPlayerName)
-		if folder then
-			self:FireAllClients("KillPlayer", MostVotedPlayerName)
-			folder:SetAttribute("Alive", false)
-		end
-	else -- A possibilidade de customizações futuras é o único motivo para a existência deste else, já que o código é repetido.
-		local folder = ServerStorage:WaitForChild("PlayerData"):FindFirstChild(MostVotedPlayerName)
-		if folder then
-			self:FireAllClients("KillPlayer", MostVotedPlayerName)
-			folder:SetAttribute("Alive", false)
+	local MostVotedPlayerNames = MostVotedOfType(typeOfVoting)
+
+	if typeOfVoting == "Werewolf" or typeOfVoting == "Normal" then
+		if MostVotedPlayerNames and #MostVotedPlayerNames == 1 then
+			local mostVotedPlayerName = MostVotedPlayerNames[1]
+			local folder = ServerStorage:WaitForChild("PlayerData"):FindFirstChild(mostVotedPlayerName)
+			if folder then
+				self:FireAllClients("KillPlayer", mostVotedPlayerName)
+				folder:SetAttribute("Alive", false)
+			end
+		elseif MostVotedPlayerNames and #MostVotedPlayerNames > 1 then
+			-- Empate, não faz nada
 		end
 	end
 end
@@ -250,7 +256,7 @@ function MainService:Interact(player1, player2)
 		if not self:InteractionsRules("checkCooldown", player1) then
 			warn(self.Game["Day"])
 			if self.Game["Day"] == false then
-				if self:GetAliveStat(player1) == false then
+				if self:GetAliveStat(player1) == false or self:GetAliveStat(player2.Name) == false then
 					return
 				end
 				if role1 == "Werewolf" then
@@ -264,6 +270,7 @@ function MainService:Interact(player1, player2)
 					end
 				elseif role1 == "Medium" then
 					warn(player1.Name .. " got the role: " .. role2 .. " of the player " .. player2.Name)
+					self.Client["RevealRole"]:Fire(player1, player2.Name, role2)
 					self:InteractionsRules("putInCooldown", player1)
 					-- Add more elseifs to make new roles
 				else
@@ -491,7 +498,6 @@ function MainService:StartGame()
 
 	while self:VerifyIfCanEnd() do
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"], true) -- Countdown to change to night
-		self:FireAllClients("VotesHandler", "Disable", "Normal", nil)
 		self:InteractionsRules("resetall", nil)
 		self:SetupVoting() -- Start listening for the new Voting
 		self:FireAllClients("VotesHandler", "Enable", "Werewolf", nil)
@@ -502,8 +508,9 @@ function MainService:StartGame()
 		self:SetupVoting() -- Start listening for the new Voting
 		self:FireAllClients("VotesHandler", "Enable", "Normal", nil)
 		self:InteractionsRules("resetall", nil)
-		self:makeACountDown(self.Configurations["TimeBetweenRounds"])
+		self:makeACountDown(self.Configurations["TimeBetweenRounds"]) -- Time to talk
 		self:FinishVoting()
+		self:FireAllClients("VotesHandler", "Disable", "Normal", nil)
 	end
 end
 

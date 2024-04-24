@@ -52,10 +52,26 @@ function clientSideController:setupButtons(enabled)
 		for _, x: TextButton in pairs(Scrolling:GetChildren()) do
 			if x:IsA("TextButton") and x.Name ~= "Template" then
 				local con = x.MouseButton1Click:Connect(function()
-					MainService:PlayerInteraction(x.Name)
+					MainService:GetAlive(Player.Name):andThen(function(isAlive)
+						warn(isAlive)
+						if isAlive then
+							MainService:PlayerInteraction(x.Name)
+						end
+					end)
 				end)
 				table.insert(ButtonConnections, con)
 			end
+		end
+	end
+end
+
+function clientSideController:RevealRole(name, role) -- Prior exploiter protection here
+	for _, x: TextButton in pairs(Scrolling:GetChildren()) do
+		if x:IsA("TextButton") and x.Name ~= "Template" and x.Name == name then
+			if Classes[role] then
+				x.Classe.TextColor3 = Classes[role]["NameColor"]
+			end
+			x.Classe.Text = role
 		end
 	end
 end
@@ -249,6 +265,10 @@ function clientSideController:KnitStart()
 
 	MainService.KillPlayer:Connect(function(name)
 		self:KillPlayer(name)
+	end)
+
+	MainService.RevealRole:Connect(function(name, role)
+		self:RevealRole(name, role)
 	end)
 end
 
