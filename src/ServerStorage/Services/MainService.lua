@@ -5,7 +5,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 local Packages = ReplicatedStorage.Packages
-local Utils = require(ReplicatedStorage.Shared.Utils)
 local Knit = require(ReplicatedStorage.Packages.Knit)
 local Observers = require(ReplicatedStorage.Packages.Observers)
 local roundTimer = ReplicatedStorage:FindFirstChild("roundTimer")
@@ -30,10 +29,11 @@ local MainService = Knit.CreateService({
 		VotesHandler = Knit.CreateSignal(),
 		KillPlayer = Knit.CreateSignal(),
 		RevealRole = Knit.CreateSignal(),
+		EndMessage = Knit.CreateSignal(),
 	},
 	PlayersInGame = {},
 	Configurations = {
-		["Werewolfs"] = 0,
+		["Werewolves"] = 0,
 		["Mediuns"] = 0,
 		["Villagers"] = 0,
 		["PlayersToStart"] = 3,
@@ -208,6 +208,9 @@ function MainService:FinishVoting()
 			if folder then
 				self:FireAllClients("KillPlayer", mostVotedPlayerName)
 				folder:SetAttribute("Alive", false)
+				local plr = game.Players:FindFirstChild(mostVotedPlayerName)
+				self.Client["ChatController"]:Fire(plr, false)
+				folder:Destroy()
 			end
 		elseif MostVotedPlayerNames and #MostVotedPlayerNames > 1 then
 			-- Empate, não faz nada
@@ -384,7 +387,7 @@ end
 
 function MainService:setRoles()
 	local playersInGame = self.PlayersInGame
-	local wolfsAmount = self.Configurations["Werewolfs"]
+	local wolfsAmount = self.Configurations["Werewolves"]
 	local mediunsAmount = self.Configurations["Mediuns"]
 	local Roles = ServerStorage:FindFirstChild("PlayerData") or Instance.new("Folder", ServerStorage)
 	Roles.Name = "PlayerData"
@@ -446,31 +449,48 @@ function MainService:setRoles()
 	end
 end
 
-function MainService:VerifyIfCanEnd()
+function MainService:VerifyIfCanEnd(str)
 	local PlayersFolders = ServerStorage:FindFirstChild("PlayerData")
 	local VillagersAccount = 0
 	local WolfsAccount = 0
 	for _, folder in pairs(PlayersFolders:GetChildren()) do
-		if folder:GetAttribute("Role") == "Villager" or folder:GetAttribute("Role") == "Medium" then
+		if
+			folder:GetAttribute("Role") == "Villager"
+			or folder:GetAttribute("Role") == "Medium" and folder:GetAttribute("Alive") == true
+		then
+			warn("Villager: " .. folder.Name)
 			VillagersAccount += 1
-		elseif folder:GetAttribute("Role") == "Werewolf" then
+		elseif folder:GetAttribute("Role") == "Werewolf" and folder:GetAttribute("Alive") == true then
 			WolfsAccount += 1
+			warn("Wolf: " .. folder.Name)
 		end
 	end
 
-	if WolfsAccount == 0 or WolfsAccount >= VillagersAccount then
-		return true
-	else
-		return false
+	if str == "bool" then
+		if WolfsAccount == 0 or WolfsAccount >= VillagersAccount then
+			return true
+		else
+			return false
+		end
+	elseif str == "team" then
+		if WolfsAccount == 0 then
+			return "Villagers"
+		elseif WolfsAccount >= VillagersAccount then
+			return "Werewolves"
+		end
 	end
 end
 
 function MainService:StartGame()
+	local PlayersFolders = ServerStorage:FindFirstChild("PlayerData")
+	if PlayersFolders then
+		PlayersFolders:Destroy()
+	end
 	local players = Players:GetChildren()
 	local playerCount = #players
 	local Mediuns
 	local werewolfAmount
-	self.Configurations["Werewolfs"] = 0
+	self.Configurations["Werewolves"] = 0
 	self.Configurations["Mediuns"] = 0
 	if playerCount >= 3 and playerCount < 7 then
 		werewolfAmount = 1
@@ -491,12 +511,13 @@ function MainService:StartGame()
 	end
 	-- Setup
 	self.PlayersInGame = {} -- Limpa se ainda não foi limpo
-	self.Configurations["Werewolfs"] = werewolfAmount
+	self.Configurations["Werewolves"] = werewolfAmount
 	self.Configurations["Mediuns"] = Mediuns
 	self:addPlayersToGame()
 	self:setRoles()
 
-	while self:VerifyIfCanEnd() do
+	while not self:VerifyIfCanEnd("bool") do
+		warn("Can End: " .. tostring(self:VerifyIfCanEnd("bool")))
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"], true) -- Countdown to change to night
 		self:InteractionsRules("resetall", nil)
 		self:SetupVoting() -- Start listening for the new Voting
@@ -511,6 +532,32 @@ function MainService:StartGame()
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"]) -- Time to talk
 		self:FinishVoting()
 		self:FireAllClients("VotesHandler", "Disable", "Normal", nil)
+	end
+	self:FireAllClients("ChatController", true)
+	self:FireAllClients("EndMessage", string.format("%s has won the game", self:VerifyIfCanEnd("team")))
+	warn("Game Ended.")
+	GameIsRunning.Value = false
+	self:makeACountDown(self.Configurations["TimeBetweenRounds"] * 2) -- Waiting before starting a new round
+	self:FireAllClients("UpdatePlayerCount", "Erase")
+	local players = Players:GetChildren()
+	local playerCount = #players
+
+	repeat
+		task.wait(2)
+		self:FireAllClients(
+			"ChangeText",
+			string.format("The game needs at least %d players to start", self.Configurations["PlayersToStart"])
+		)
+	until playerCount >= self.Configurations["PlayersToStart"]
+
+	if playerCount >= self.Configurations["PlayersToStart"] then
+		if GameIsRunning.Value == false then
+			GameIsRunning.Value = true
+			warn("Game Restarted")
+			self:StartGame()
+		else
+			return
+		end
 	end
 end
 
@@ -529,7 +576,7 @@ function MainService:KnitStart()
 		else
 			self:FireAllClients(
 				"ChangeText",
-				string.format("The game need at least %d players", self.Configurations["PlayersToStart"])
+				string.format("The game needs at least %d players to start", self.Configurations["PlayersToStart"])
 			)
 			-- Tell everyone that the game can't be started
 		end
@@ -537,6 +584,11 @@ function MainService:KnitStart()
 		return function()
 			self:FireAllClients("UpdatePlayerCount")
 			self:FireAllClients("RemovePlayer", player.Name)
+			local PlayersFolders = ServerStorage:FindFirstChild("PlayerData")
+			local targetedFolder = PlayersFolders:FindFirstChild(player.Name)
+			if targetedFolder then
+				targetedFolder:Destroy()
+			end
 			self.Game.PlayerCount -= 1
 			local index = table.find(self.PlayersInGame, player)
 			if index then
@@ -545,6 +597,7 @@ function MainService:KnitStart()
 		end
 	end)
 end
+
 function MainService:KnitInit() end
 
 return MainService

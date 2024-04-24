@@ -41,6 +41,16 @@ function clientSideController:UpdateTimer()
 	Timer.Text = formatTime(valor)
 end
 
+function clientSideController:WriteMessage(message)
+	local endMessage = MainGui.Frame.WinScreen
+
+	endMessage.Text = message
+	endMessage.Visible = true
+	task.delay(15, function()
+		endMessage.Visible = false
+	end)
+end
+
 function clientSideController:setupButtons(enabled)
 	local MainService = Knit.GetService("MainService")
 
@@ -179,6 +189,14 @@ function clientSideController:EnableVotations(type, bool)
 	end
 end
 
+function clientSideController:CleanupScrolling()
+	for _, x in pairs(Scrolling:GetChildren()) do
+		if x:IsA("TextButton") and x.Name ~= "Template" then
+			x:Destroy()
+		end
+	end
+end
+
 function clientSideController:GetNewPlayer(userId)
 	local MainService = Knit.GetService("MainService")
 	local TargetedPlayer = Players:GetPlayerByUserId(userId)
@@ -235,8 +253,12 @@ function clientSideController:KnitStart()
 		self:UpdateTimer()
 	end)
 
-	MainService.UpdatePlayerCount:Connect(function()
-		self:UpdatePlayers()
+	MainService.UpdatePlayerCount:Connect(function(type)
+		if type == nil then
+			self:UpdatePlayers()
+		elseif type == "Erase" then
+			self:CleanupScrolling()
+		end
 	end)
 
 	MainService.RemovePlayer:Connect(function(playerName)
@@ -269,6 +291,10 @@ function clientSideController:KnitStart()
 
 	MainService.RevealRole:Connect(function(name, role)
 		self:RevealRole(name, role)
+	end)
+
+	MainService.EndMessage:Connect(function(message)
+		self:WriteMessage(message)
 	end)
 end
 
