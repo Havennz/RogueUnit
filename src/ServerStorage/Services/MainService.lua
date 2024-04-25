@@ -37,7 +37,7 @@ local MainService = Knit.CreateService({
 		["Werewolves"] = 0,
 		["Mediuns"] = 0,
 		["Villagers"] = 0,
-		["PlayersToStart"] = 4,
+		["PlayersToStart"] = 4, -- Se for menos de 4 jogadores o jogo acaba na primeira noite.
 		["TimeBetweenRounds"] = 35,
 		["GameStarted"] = false,
 	},
