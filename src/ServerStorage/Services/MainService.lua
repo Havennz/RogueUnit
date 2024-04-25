@@ -30,13 +30,14 @@ local MainService = Knit.CreateService({
 		KillPlayer = Knit.CreateSignal(),
 		RevealRole = Knit.CreateSignal(),
 		EndMessage = Knit.CreateSignal(),
+		DoubleVerify = Knit.CreateSignal(),
 	},
 	PlayersInGame = {},
 	Configurations = {
 		["Werewolves"] = 0,
 		["Mediuns"] = 0,
 		["Villagers"] = 0,
-		["PlayersToStart"] = 3,
+		["PlayersToStart"] = 4,
 		["TimeBetweenRounds"] = 35,
 		["GameStarted"] = false,
 	},
@@ -205,11 +206,11 @@ function MainService:FinishVoting()
 		if MostVotedPlayerNames and #MostVotedPlayerNames == 1 then
 			local mostVotedPlayerName = MostVotedPlayerNames[1]
 			local folder = ServerStorage:WaitForChild("PlayerData"):FindFirstChild(mostVotedPlayerName)
+			local player = game.Players:FindFirstChild(mostVotedPlayerName)
 			if folder then
 				self:FireAllClients("KillPlayer", mostVotedPlayerName)
 				folder:SetAttribute("Alive", false)
-				local plr = game.Players:FindFirstChild(mostVotedPlayerName)
-				self.Client["ChatController"]:Fire(plr, false)
+				self:MuteHandler(false, "solo", mostVotedPlayerName)
 				folder:Destroy()
 			end
 		elseif MostVotedPlayerNames and #MostVotedPlayerNames > 1 then
@@ -479,6 +480,24 @@ function MainService:VerifyIfCanEnd(str)
 			return "Werewolves"
 		end
 	end
+	self:FireAllClients("DoubleVerify")
+end
+
+function MainService:MuteHandler(bool, type, playerName)
+	local folder = ServerStorage:WaitForChild("PlayerData")
+	if type == "all" then
+		for _, x in pairs(folder:GetChildren()) do
+			local player = game.Players:FindFirstChild(x.Name)
+			if player and x:GetAttribute("Alive") == true then
+				MainService.Client["ChatController"]:Fire(player, bool)
+			end
+		end
+	else
+		local player = game.Players:FindFirstChild(playerName)
+		if player then
+			MainService.Client["ChatController"]:Fire(player, bool)
+		end
+	end
 end
 
 function MainService:StartGame()
@@ -515,23 +534,36 @@ function MainService:StartGame()
 	self.Configurations["Mediuns"] = Mediuns
 	self:addPlayersToGame()
 	self:setRoles()
-
 	while not self:VerifyIfCanEnd("bool") do
 		warn("Can End: " .. tostring(self:VerifyIfCanEnd("bool")))
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"], true) -- Countdown to change to night
+		if self:VerifyIfCanEnd("bool") then
+			self:makeACountDown(self.Configurations["TimeBetweenRounds"], true)
+			break
+		end
+		self:MuteHandler(false, "all")
 		self:InteractionsRules("resetall", nil)
 		self:SetupVoting() -- Start listening for the new Voting
 		self:FireAllClients("VotesHandler", "Enable", "Werewolf", nil)
 		self:FireAllClients("EnableButtons", true)
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"], true) -- Countdown to change to day
+		task.delay(1, function()
+			self:MuteHandler(true, "all")
+		end)
 		self:FinishVoting()
 		self:FireAllClients("VotesHandler", "Disable", "Werewolf", nil)
+		if self:VerifyIfCanEnd("bool") then
+			break
+		end
 		self:SetupVoting() -- Start listening for the new Voting
 		self:FireAllClients("VotesHandler", "Enable", "Normal", nil)
 		self:InteractionsRules("resetall", nil)
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"]) -- Time to talk
 		self:FinishVoting()
 		self:FireAllClients("VotesHandler", "Disable", "Normal", nil)
+		if self:VerifyIfCanEnd("bool") then
+			break
+		end
 	end
 	self:FireAllClients("ChatController", true)
 	self:FireAllClients("EndMessage", string.format("%s has won the game", self:VerifyIfCanEnd("team")))

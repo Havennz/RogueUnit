@@ -110,7 +110,9 @@ function clientSideController:KillPlayer(playerName)
 end
 
 function clientSideController:ChatController(bool)
-	PlayerGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, bool)
+	warn("Toogling")
+	local StarterGui = game:GetService("StarterGui")
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, bool)
 end
 
 function clientSideController:setGameState(str)
@@ -197,6 +199,23 @@ function clientSideController:CleanupScrolling()
 	end
 end
 
+function clientSideController:VerifyIntegrity()
+	for _, frame in pairs(Scrolling:GetChildren()) do
+		if frame:IsA("TextButton") and frame.Name ~= "Template" then
+			local playerFound = false
+			for _, player in pairs(Players:GetPlayers()) do
+				if frame.Name == player.Name then
+					playerFound = true
+					break
+				end
+			end
+			if not playerFound then
+				frame:Destroy()
+			end
+		end
+	end
+end
+
 function clientSideController:GetNewPlayer(userId)
 	local MainService = Knit.GetService("MainService")
 	local TargetedPlayer = Players:GetPlayerByUserId(userId)
@@ -274,6 +293,7 @@ function clientSideController:KnitStart()
 	end)
 
 	MainService.ChatController:Connect(function(bool)
+		warn("Got it")
 		self:ChatController(bool)
 	end)
 
@@ -296,6 +316,26 @@ function clientSideController:KnitStart()
 	MainService.EndMessage:Connect(function(message)
 		self:WriteMessage(message)
 	end)
+
+	MainService.DoubleVerify:Connect(function()
+		self:VerifyIntegrity()
+	end)
+
+	local Humanoid: Humanoid = Player.Character:WaitForChild("Humanoid")
+	if Humanoid then
+		Humanoid.WalkSpeed = 0
+	end
+
+	local StarterGui = game:GetService("StarterGui")
+	local Success
+	while true do
+		Success, x = pcall(StarterGui.SetCore, StarterGui, "ResetButtonCallback", false)
+		if Success then
+			break
+		else
+			task.wait()
+		end --No need to yield if the operation was successful.
+	end
 end
 
 function clientSideController:KnitInit() end
