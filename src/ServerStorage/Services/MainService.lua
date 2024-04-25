@@ -258,7 +258,6 @@ function MainService:Interact(player1, player2)
 		local role1 = self:GetRole(player1)
 		local role2 = self:GetRole(player2.Name)
 		if not self:InteractionsRules("checkCooldown", player1) then
-			warn(self.Game["Day"])
 			if self.Game["Day"] == false then
 				if self:GetAliveStat(player1) == false or self:GetAliveStat(player2.Name) == false then
 					return
@@ -284,7 +283,6 @@ function MainService:Interact(player1, player2)
 				if self:GetAliveStat(player1) == false then
 					return
 				end
-				print("Adding normal Votes to: " .. player2.Name)
 				self:AddVote(player2, "Normal")
 				self:InteractionsRules("putInCooldown", player1)
 			end
@@ -401,7 +399,6 @@ function MainService:setRoles()
 		local assigned = false
 		for _, player in pairs(playersInGame) do
 			if not Roles:FindFirstChild(player.Name) then
-				warn("Were: " .. player.Name)
 				local fold = Instance.new("Folder")
 				fold.Name = player.Name
 				fold:SetAttribute("Role", "Werewolf")
@@ -420,7 +417,6 @@ function MainService:setRoles()
 		local assigned = false
 		for _, player in pairs(playersInGame) do
 			if not Roles:FindFirstChild(player.Name) then
-				warn("Med: " .. player.Name)
 				local fold = Instance.new("Folder")
 				fold.Name = player.Name
 				fold:SetAttribute("Role", "Medium")
@@ -437,7 +433,6 @@ function MainService:setRoles()
 	-- Assign villager roles to remaining players
 	for _, player in pairs(playersInGame) do
 		if not Roles:FindFirstChild(player.Name) then
-			warn("Villager: " .. player.Name)
 			local fold = Instance.new("Folder")
 			fold.Name = player.Name
 			fold:SetAttribute("Role", "Villager")
@@ -459,11 +454,9 @@ function MainService:VerifyIfCanEnd(str)
 			folder:GetAttribute("Role") == "Villager"
 			or folder:GetAttribute("Role") == "Medium" and folder:GetAttribute("Alive") == true
 		then
-			warn("Villager: " .. folder.Name)
 			VillagersAccount += 1
 		elseif folder:GetAttribute("Role") == "Werewolf" and folder:GetAttribute("Alive") == true then
 			WolfsAccount += 1
-			warn("Wolf: " .. folder.Name)
 		end
 	end
 
@@ -535,7 +528,6 @@ function MainService:StartGame()
 	self:addPlayersToGame()
 	self:setRoles()
 	while not self:VerifyIfCanEnd("bool") do
-		warn("Can End: " .. tostring(self:VerifyIfCanEnd("bool")))
 		self:makeACountDown(self.Configurations["TimeBetweenRounds"], true) -- Countdown to change to night
 		if self:VerifyIfCanEnd("bool") then
 			self:makeACountDown(self.Configurations["TimeBetweenRounds"], true)
@@ -567,7 +559,6 @@ function MainService:StartGame()
 	end
 	self:FireAllClients("ChatController", true)
 	self:FireAllClients("EndMessage", string.format("%s has won the game", self:VerifyIfCanEnd("team")))
-	warn("Game Ended.")
 	GameIsRunning.Value = false
 	self:makeACountDown(self.Configurations["TimeBetweenRounds"] * 2) -- Waiting before starting a new round
 	self:FireAllClients("UpdatePlayerCount", "Erase")
@@ -585,7 +576,6 @@ function MainService:StartGame()
 	if playerCount >= self.Configurations["PlayersToStart"] then
 		if GameIsRunning.Value == false then
 			GameIsRunning.Value = true
-			warn("Game Restarted")
 			self:StartGame()
 		else
 			return
@@ -600,7 +590,6 @@ function MainService:KnitStart()
 		if self.Game.PlayerCount >= self.Configurations["PlayersToStart"] then
 			if GameIsRunning.Value == false then
 				GameIsRunning.Value = true
-				warn("Game Started")
 				self:StartGame()
 			else
 				return

@@ -63,7 +63,6 @@ function clientSideController:setupButtons(enabled)
 			if x:IsA("TextButton") and x.Name ~= "Template" then
 				local con = x.MouseButton1Click:Connect(function()
 					MainService:GetAlive(Player.Name):andThen(function(isAlive)
-						warn(isAlive)
 						if isAlive then
 							MainService:PlayerInteraction(x.Name)
 						end
@@ -110,7 +109,6 @@ function clientSideController:KillPlayer(playerName)
 end
 
 function clientSideController:ChatController(bool)
-	warn("Toogling")
 	local StarterGui = game:GetService("StarterGui")
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, bool)
 end
@@ -154,7 +152,6 @@ function clientSideController:EnableVotations(type, bool)
 			if x:IsA("TextButton") and x.Name ~= "Template" then
 				local TargetFolder = VotesFolder:FindFirstChild(x.Name)
 				MainService:GetAlive(x.Name):andThen(function(isAlive)
-					print(isAlive)
 					if isAlive == true then
 						if type == "Werewolf" then
 							MainService:GetClass(Player.Name):andThen(function(Classe)
@@ -244,7 +241,6 @@ function clientSideController:GetNewPlayer(userId)
 				ClonedTemplate.Classe.TextColor3 = Classes[role]["NameColor"]
 			else
 				-- Handle the case where role is not a valid class
-				print("Warning: Invalid role:", role)
 			end
 			ClonedTemplate.Visible = true
 		end
@@ -293,7 +289,6 @@ function clientSideController:KnitStart()
 	end)
 
 	MainService.ChatController:Connect(function(bool)
-		warn("Got it")
 		self:ChatController(bool)
 	end)
 
