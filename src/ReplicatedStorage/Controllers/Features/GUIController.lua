@@ -1,24 +1,21 @@
-local Players = game:GetService("Players")
-local Player = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local Knit = require(ReplicatedStorage.Packages.Knit)
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local MainGui = PlayerGui:WaitForChild("MainGui")
+local Exterior: Frame = MainGui.Frame
+local Interior: Frame = Exterior.Frame
+local Scrolling: ScrollingFrame = Interior.ScrollingFrame
 local Classes = require(ReplicatedStorage.Shared.Classes)
 local Themes = require(ReplicatedStorage.Shared.Themes)
 local roundTimer = ReplicatedStorage:WaitForChild("roundTimer")
 local VotesFolder = ReplicatedStorage:FindFirstChild("VotesFolder")
 local Observers = require(ReplicatedStorage.Packages.Observers)
 
-local PlayerGui = Player:WaitForChild("PlayerGui")
-local MainGui = PlayerGui:WaitForChild("MainGui")
-local Exterior: Frame = MainGui.Frame
-local Interior: Frame = Exterior.Frame
-local Scrolling: ScrollingFrame = Interior.ScrollingFrame
-
-local ButtonConnections = {}
-
-local clientSideController = Knit.CreateController({
-	Name = "clientSideController",
+local GUIController = Knit.CreateController({
+	Name = "GUIController",
 })
 
 function formatTime(seconds)
@@ -31,7 +28,7 @@ function formatTime(seconds)
 	return minutesString .. ":" .. secondsString
 end
 
-function clientSideController:UpdateTimer()
+function GUIController:UpdateTimer()
 	local Timer = MainGui.Frame.Timer
 	local valor = roundTimer.Value
 	if valor < 0 then
@@ -41,7 +38,7 @@ function clientSideController:UpdateTimer()
 	Timer.Text = formatTime(valor)
 end
 
-function clientSideController:WriteMessage(message)
+function GUIController:WriteMessage(message)
 	local endMessage = MainGui.Frame.WinScreen
 
 	endMessage.Text = message
@@ -51,69 +48,40 @@ function clientSideController:WriteMessage(message)
 	end)
 end
 
-function clientSideController:setupButtons(enabled)
-	local MainService = Knit.GetService("MainService")
+function GUIController:setupButtons()
+	local InteractionService = Knit.GetService("InteractionService")
+	local PlayersService = Knit.GetService("PlayersService")
 
-	if enabled == false then
-		for _, x: RBXScriptConnection in pairs(ButtonConnections) do
-			x:Disconnect()
-		end
-	else
-		for _, x: TextButton in pairs(Scrolling:GetChildren()) do
-			if x:IsA("TextButton") and x.Name ~= "Template" then
-				local con = x.MouseButton1Click:Connect(function()
-					MainService:GetAlive(Player.Name):andThen(function(isAlive)
-						if isAlive then
-							MainService:PlayerInteraction(x.Name)
-						end
-					end)
-				end)
-				table.insert(ButtonConnections, con)
-			end
-		end
-	end
-end
-
-function clientSideController:RevealRole(name, role) -- Prior exploiter protection here
 	for _, x: TextButton in pairs(Scrolling:GetChildren()) do
-		if x:IsA("TextButton") and x.Name ~= "Template" and x.Name == name then
-			if Classes[role] then
-				x.Classe.TextColor3 = Classes[role]["NameColor"]
-			end
-			x.Classe.Text = role
+		if x:IsA("TextButton") and x.Name ~= "Template" then
+			PlayersService:GetAlive(Player.Name):andThen(function(isAlive)
+				if isAlive then
+					x.MouseButton1Click:Connect(function()
+						PlayersService:GetAlive(Player.Name):andThen(function(isAlive)
+							if isAlive then
+								InteractionService:PlayerInteraction(x.Name)
+							end
+						end)
+					end)
+				end
+			end)
 		end
 	end
 end
 
-function clientSideController:ChangeText(text)
+function GUIController:ChangeText(text)
 	local Timer = MainGui.Frame.Timer
 
 	Timer.Text = text
 end
 
-function clientSideController:UpdatePlayers()
+function GUIController:UpdatePlayers()
 	local Timer = MainGui.Frame.PlayerCounter
 
 	Timer.Text = (tostring(#Players:GetChildren()) .. "/8")
 end
 
-function clientSideController:KillPlayer(playerName)
-	for _, x in pairs(Scrolling:GetChildren()) do
-		if x:IsA("TextButton") and x.Name == playerName then
-			local DP = x:FindFirstChild("DeadDisplay")
-			if DP then
-				DP.Visible = true
-			end
-		end
-	end
-end
-
-function clientSideController:ChatController(bool)
-	local StarterGui = game:GetService("StarterGui")
-	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Chat, bool)
-end
-
-function clientSideController:setGameState(str)
+function GUIController:setGameState(str)
 	local Text1 = Exterior:WaitForChild("Timer")
 	local Text2 = Exterior:WaitForChild("PlayerCounter")
 
@@ -144,19 +112,19 @@ function clientSideController:setGameState(str)
 	end
 end
 
-function clientSideController:EnableVotations(type, bool)
-	local MainService = Knit.GetService("MainService")
-
+function GUIController:EnableVotations(type, bool)
+	local PlayersService = Knit.GetService("PlayersService")
+	local RolesService = Knit.GetService("RolesService")
 	if bool == true then
 		for _, x in pairs(Scrolling:GetChildren()) do
 			if x:IsA("TextButton") and x.Name ~= "Template" then
 				local TargetFolder = VotesFolder:FindFirstChild(x.Name)
-				MainService:GetAlive(x.Name):andThen(function(isAlive)
+				PlayersService:GetAlive(x.Name):andThen(function(isAlive)
 					if isAlive == true then
 						if type == "Werewolf" then
-							MainService:GetClass(Player.Name):andThen(function(Classe)
+							RolesService:GetClass(Player.Name):andThen(function(Classe)
 								if Classe == "Werewolf" then
-									MainService:GetClass(x.Name):andThen(function(Classe)
+									RolesService:GetClass(x.Name):andThen(function(Classe)
 										local role = Classe
 										if role ~= "Werewolf" then
 											Observers.observeAttribute(TargetFolder, "WerewolfVotes", function(value)
@@ -188,7 +156,7 @@ function clientSideController:EnableVotations(type, bool)
 	end
 end
 
-function clientSideController:CleanupScrolling()
+function GUIController:CleanupScrolling()
 	for _, x in pairs(Scrolling:GetChildren()) do
 		if x:IsA("TextButton") and x.Name ~= "Template" then
 			x:Destroy()
@@ -196,7 +164,7 @@ function clientSideController:CleanupScrolling()
 	end
 end
 
-function clientSideController:VerifyIntegrity()
+function GUIController:VerifyIntegrity()
 	for _, frame in pairs(Scrolling:GetChildren()) do
 		if frame:IsA("TextButton") and frame.Name ~= "Template" then
 			local playerFound = false
@@ -213,10 +181,9 @@ function clientSideController:VerifyIntegrity()
 	end
 end
 
-function clientSideController:GetNewPlayer(userId)
-	local MainService = Knit.GetService("MainService")
+function GUIController:GetNewPlayer(userId)
 	local TargetedPlayer = Players:GetPlayerByUserId(userId)
-
+	local RolesService = Knit.GetService("RolesService")
 	if Scrolling:FindFirstChild(TargetedPlayer.Name) then
 		return -- Already found this specific player in the list, not adding
 	end
@@ -225,7 +192,7 @@ function clientSideController:GetNewPlayer(userId)
 	local thumbSize = Enum.ThumbnailSize.Size420x420
 	local content, isReady = Players:GetUserThumbnailAsync(userId, thumbType, thumbSize)
 	local role
-	MainService:GetClass(TargetedPlayer.Name):andThen(function(Classe)
+	RolesService:GetClass(TargetedPlayer.Name):andThen(function(Classe)
 		role = Classe
 		if Scrolling:FindFirstChild(TargetedPlayer.Name) then
 			return
@@ -247,28 +214,29 @@ function clientSideController:GetNewPlayer(userId)
 	end)
 end
 
-function clientSideController:RemovePlayer(playerName)
+function GUIController:RemovePlayer(playerName)
 	local target = Scrolling:FindFirstChild(playerName, true)
 	if target then
 		target:Destroy()
 	end
 end
 
-function clientSideController:KnitStart()
-	local MainService = Knit.GetService("MainService")
-	MainService.PlayerAdded:Connect(function(id)
+function GUIController:KnitStart()
+	local PlayersService = Knit.GetService("PlayersService")
+
+	PlayersService.PlayerAdded:Connect(function(id)
 		self:GetNewPlayer(id)
 	end)
 
-	MainService.ChangeTime:Connect(function(str)
+	PlayersService.ChangeTime:Connect(function(str)
 		self:setGameState(str)
 	end)
 
-	MainService.UpdateCountdown:Connect(function()
+	PlayersService.UpdateCountdown:Connect(function()
 		self:UpdateTimer()
 	end)
 
-	MainService.UpdatePlayerCount:Connect(function(type)
+	PlayersService.UpdatePlayerCount:Connect(function(type)
 		if type == nil then
 			self:UpdatePlayers()
 		elseif type == "Erase" then
@@ -276,23 +244,19 @@ function clientSideController:KnitStart()
 		end
 	end)
 
-	MainService.RemovePlayer:Connect(function(playerName)
+	PlayersService.RemovePlayer:Connect(function(playerName)
 		self:RemovePlayer(playerName)
 	end)
 
-	MainService.ChangeText:Connect(function(str)
+	PlayersService.ChangeText:Connect(function(str)
 		self:ChangeText(str)
 	end)
 
-	MainService.EnableButtons:Connect(function(bool)
+	PlayersService.EnableButtons:Connect(function(bool)
 		self:setupButtons(bool)
 	end)
 
-	MainService.ChatController:Connect(function(bool)
-		self:ChatController(bool)
-	end)
-
-	MainService.VotesHandler:Connect(function(type, version)
+	PlayersService.VotesHandler:Connect(function(type, version)
 		if type == "Enable" then
 			self:EnableVotations(version, true)
 		elseif type == "Disable" then
@@ -300,39 +264,15 @@ function clientSideController:KnitStart()
 		end
 	end)
 
-	MainService.KillPlayer:Connect(function(name)
-		self:KillPlayer(name)
-	end)
-
-	MainService.RevealRole:Connect(function(name, role)
-		self:RevealRole(name, role)
-	end)
-
-	MainService.EndMessage:Connect(function(message)
+	PlayersService.EndMessage:Connect(function(message)
 		self:WriteMessage(message)
 	end)
 
-	MainService.DoubleVerify:Connect(function()
+	PlayersService.DoubleVerify:Connect(function()
 		self:VerifyIntegrity()
 	end)
-
-	local Humanoid: Humanoid = Player.Character:WaitForChild("Humanoid")
-	if Humanoid then
-		Humanoid.WalkSpeed = 0
-	end
-
-	local StarterGui = game:GetService("StarterGui")
-	local Success
-	while true do
-		Success, x = pcall(StarterGui.SetCore, StarterGui, "ResetButtonCallback", false)
-		if Success then
-			break
-		else
-			task.wait()
-		end --No need to yield if the operation was successful.
-	end
 end
 
-function clientSideController:KnitInit() end
+function GUIController:KnitInit() end
 
-return clientSideController
+return GUIController
